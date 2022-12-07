@@ -1900,7 +1900,7 @@ Bugfixes and other improvements for your Zulip experience.
 ### Highlights for users (since 26.1.124 / 26.2.125)
 
 * Highlight colors for code blocks now match the webapp and
-  offer more contrast, especially in night mode.
+  offer more contrast, especially in Dark theme.
 
 Plus, like every release, many other improvements for your Zulip
 experience.
@@ -1919,7 +1919,7 @@ experience.
 ### Highlights for users (since 26.1.124 / 26.2.125)
 
 * Highlight colors for code blocks now match the webapp and
-  offer more contrast, especially in night mode.
+  offer more contrast, especially in Dark theme.
 
 Plus, like every release, many other improvements for your Zulip
 experience.
