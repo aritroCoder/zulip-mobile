@@ -79,13 +79,13 @@ const projectForPlatform = platform => {
     globals: {
       __TEST__: true,
     },
-    timers: 'modern',
+    timers: 'fake',
     globalSetup: './jest/globalSetup.js',
     setupFiles: [
       './jest/globalFetch.js',
       './node_modules/react-native-gesture-handler/jestSetup.js',
     ],
-    setupFilesAfterEnv: ['./jest/jestSetup.js', 'jest-extended'],
+    setupFilesAfterEnv: ['./jest/jestSetup.js', 'jest-extended/all'],
   };
 };
 
