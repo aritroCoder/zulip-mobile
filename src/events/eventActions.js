@@ -23,7 +23,6 @@ import { BackoffMachine, TimeoutError } from '../utils/async';
 import { ApiError, RequestError, Server5xxError, NetworkError } from '../api/apiErrors';
 import * as logging from '../utils/logging';
 import { showErrorAlert } from '../utils/info';
-import { ZulipVersion } from '../utils/zulipVersion';
 import { tryFetch, fetchPrivateMessages } from '../message/fetchActions';
 import { MIN_RECENTPMS_SERVER_VERSION } from '../pm-conversations/pmConversationsModel';
 import { sendOutbox } from '../outbox/outboxActions';
@@ -147,6 +146,11 @@ export const registerAndStartPolling =
       if (e instanceof ApiError) {
         // This should only happen when `auth` is no longer valid. No
         // use retrying; just log out.
+
+        // Why not dispatch tryStopNotifications too? Because we don't
+        // expect any API requests to succeed with an invalid auth. And we
+        // *do* expect that whatever invalidated the auth also caused the
+        // server to forget all push tokens.
         dispatch(logout());
       } else if (e instanceof Server5xxError) {
         dispatch(registerAbort('server'));
@@ -166,7 +170,7 @@ export const registerAndStartPolling =
       return;
     }
 
-    const serverVersion = new ZulipVersion(initData.zulip_version);
+    const serverVersion = initData.zulip_version;
 
     // Set Sentry tags for the server version immediately, so they're accurate
     // in case we hit an exception in reducers on `registerComplete` below.
@@ -307,6 +311,11 @@ export const startEventPolling =
 
         if (e instanceof RequestError && e.httpStatus === 401) {
           // 401 Unauthorized -> our `auth` is invalid.  No use retrying.
+
+          // Why not dispatch tryStopNotifications too? Because we don't
+          // expect any API requests to succeed with an invalid auth. And we
+          // *do* expect that whatever invalidated the auth also caused the
+          // server to forget all push tokens.
           dispatch(logout());
           break;
         }

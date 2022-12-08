@@ -6,8 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import type { RouteProp } from '../react-navigation';
 import type { AppNavigationProp } from '../nav/AppNavigator';
-import type { ApiResponseServerSettings } from '../api/settings/getServerSettings';
-import ErrorMsg from '../common/ErrorMsg';
+import type { ServerSettings } from '../api/settings/getServerSettings';
 import ZulipTextIntl from '../common/ZulipTextIntl';
 import Screen from '../common/Screen';
 import ZulipButton from '../common/ZulipButton';
@@ -15,28 +14,59 @@ import { tryParseUrl } from '../utils/url';
 import * as api from '../api';
 import { ThemeContext } from '../styles/theme';
 import { createStyleSheet, HALF_COLOR } from '../styles';
+import { showErrorAlert } from '../utils/info';
+import { TranslationContext } from '../boot/TranslationProvider';
+import type { LocalizableText } from '../types';
 
 type Props = $ReadOnly<{|
   navigation: AppNavigationProp<'realm-input'>,
   route: RouteProp<'realm-input', {| initial: boolean | void |}>,
 |}>;
 
-const urlFromInputValue = (realmInputValue: string): URL | void => {
+enum ValidationError {
+  InvalidUrl = 0,
+  NoUseEmail = 1,
+}
+
+function validationErrorMsg(validationError: ValidationError): LocalizableText {
+  switch (validationError) {
+    case ValidationError.InvalidUrl:
+      return 'Please enter a valid URL.';
+    case ValidationError.NoUseEmail:
+      return 'Please enter the server URL, not your email.';
+  }
+}
+
+type MaybeParsedInput =
+  | {| +valid: true, value: URL |}
+  | {| +valid: false, error: ValidationError |};
+
+const tryParseInput = (realmInputValue: string): MaybeParsedInput => {
   const withScheme = /^https?:\/\//.test(realmInputValue)
     ? realmInputValue
     : `https://${realmInputValue}`;
 
-  return tryParseUrl(withScheme);
+  const url = tryParseUrl(withScheme);
+
+  if (!url) {
+    return { valid: false, error: ValidationError.InvalidUrl };
+  }
+  if (url.username !== '') {
+    return { valid: false, error: ValidationError.NoUseEmail };
+  }
+
+  return { valid: true, value: url };
 };
 
 export default function RealmInputScreen(props: Props): Node {
   const { navigation, route } = props;
 
+  const _ = React.useContext(TranslationContext);
   const themeContext = React.useContext(ThemeContext);
 
   const [progress, setProgress] = React.useState(false);
   const [realmInputValue, setRealmInputValue] = React.useState('');
-  const [error, setError] = React.useState(null);
+  const maybeParsedInput = tryParseInput(realmInputValue);
 
   const textInputRef = React.useRef<React$ElementRef<typeof TextInput> | null>(null);
 
@@ -59,25 +89,19 @@ export default function RealmInputScreen(props: Props): Node {
   );
 
   const tryRealm = React.useCallback(async () => {
-    const parsedRealm = urlFromInputValue(realmInputValue);
-    if (!parsedRealm) {
-      setError('Please enter a valid URL');
-      return;
-    }
-    if (parsedRealm.username !== '') {
-      setError('Please enter the server URL, not your email');
+    if (!maybeParsedInput.valid) {
+      showErrorAlert(_('Invalid input'), _(validationErrorMsg(maybeParsedInput.error)));
       return;
     }
 
     setProgress(true);
-    setError(null);
     try {
-      const serverSettings: ApiResponseServerSettings = await api.getServerSettings(parsedRealm);
+      const serverSettings: ServerSettings = await api.getServerSettings(maybeParsedInput.value);
       navigation.push('auth', { serverSettings });
       Keyboard.dismiss();
     } catch (errorIllTyped) {
       const err: mixed = errorIllTyped; // https://github.com/facebook/flow/issues/2470
-      setError('Cannot connect to server');
+      showErrorAlert(_('Cannot connect to server.'));
       /* eslint-disable no-console */
       console.warn('RealmInputScreen: failed to connect to server:', err);
       // $FlowFixMe[incompatible-cast]: assuming caught exception was Error
@@ -85,7 +109,7 @@ export default function RealmInputScreen(props: Props): Node {
     } finally {
       setProgress(false);
     }
-  }, [navigation, realmInputValue]);
+  }, [navigation, maybeParsedInput, _]);
 
   const styles = React.useMemo(
     () =>
@@ -138,17 +162,14 @@ export default function RealmInputScreen(props: Props): Node {
           ref={textInputRef}
         />
       </View>
-      {error !== null ? (
-        <ErrorMsg error={error} />
-      ) : (
-        <ZulipTextIntl text="e.g. zulip.example.com" style={styles.hintText} />
-      )}
+      <ZulipTextIntl text="e.g. zulip.example.com" style={styles.hintText} />
       <ZulipButton
         style={styles.button}
         text="Enter"
         progress={progress}
         onPress={tryRealm}
-        disabled={urlFromInputValue(realmInputValue) === undefined}
+        isPressHandledWhenDisabled
+        disabled={!maybeParsedInput.valid}
       />
     </Screen>
   );
