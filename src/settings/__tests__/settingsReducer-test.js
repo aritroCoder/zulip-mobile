@@ -79,12 +79,12 @@ describe('settingsReducer', () => {
     test('changes value of a key', () => {
       const action = deepFreeze({
         type: SET_GLOBAL_SETTINGS,
-        update: { theme: 'dark' },
+        update: { theme: 'night' },
       });
 
       const expectedState = {
         ...baseState,
-        theme: 'dark',
+        theme: 'night',
       };
 
       const actualState = settingsReducer(baseState, action);
