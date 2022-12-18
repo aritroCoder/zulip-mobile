@@ -5,11 +5,10 @@ import type { PerAccountApplicableAction } from '../types';
 import type { UnreadHuddlesState } from './unreadModelTypes';
 import {
   REGISTER_COMPLETE,
-  LOGOUT,
-  ACCOUNT_SWITCH,
   EVENT_NEW_MESSAGE,
   EVENT_MESSAGE_DELETE,
   EVENT_UPDATE_MESSAGE_FLAGS,
+  RESET_ACCOUNT_DATA,
 } from '../actionConstants';
 import {
   pmUnreadsKeyFromMessage,
@@ -91,12 +90,17 @@ export default (
   globalState: PerAccountState,
 ): UnreadHuddlesState => {
   switch (action.type) {
-    case LOGOUT:
-    case ACCOUNT_SWITCH:
+    case RESET_ACCOUNT_DATA:
       return initialState;
 
     case REGISTER_COMPLETE:
-      return (action.data.unread_msgs && action.data.unread_msgs.huddles) || initialState;
+      return (
+        (action.data.unread_msgs && action.data.unread_msgs.huddles)
+        // TODO(#5102): Delete fallback once we refuse to connect to Zulip
+        //   servers before 1.7.0, when it seems this feature was added; see
+        //   comment on InitialDataUpdateMessageFlags.
+        || initialState
+      );
 
     case EVENT_NEW_MESSAGE:
       return eventNewMessage(state, action);

@@ -130,13 +130,25 @@ def jscFlavor = 'org.webkit:android-jsc-intl:+'
  */
 def enableHermes = project.ext.react.get("enableHermes", false);
 
+/**
+ * Architectures to build native code for.
+ */
+def reactNativeArchitectures() {
+    def value = project.getProperties().get("reactNativeArchitectures")
+    return value ? value.split(",") : ["armeabi-v7a", "x86", "x86_64", "arm64-v8a"]
+}
+
+// Useful for syncing dependency versions from RN upstream.
+def rnProperties = new Properties()
+rnProperties.load(new FileInputStream(file("../../node_modules/react-native/ReactAndroid/gradle.properties")))
+
 android {
     defaultConfig {
         applicationId "com.zulipmobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 196
-        versionName "27.196"
+        versionCode 197
+        versionName "27.197"
     }
     signingConfigs {
         // The RN v0.60 template app suggests configuring a debug
@@ -164,7 +176,7 @@ android {
             reset()
             enable true // Build a separate APK for each ABI.
             universalApk false  // If true, also generate a universal APK
-            include "armeabi-v7a", "x86", "arm64-v8a", "x86_64"
+            include (*reactNativeArchitectures())
         }
     }
     buildTypes {
@@ -194,23 +206,34 @@ repositories {
 }
 
 dependencies {
-    implementation fileTree(dir: "libs", include: ["*.jar"])
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+
     implementation "androidx.core:core-ktx:1.7.0"
     implementation 'androidx.appcompat:appcompat:1.0.0'
-    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.0.0"
+    implementation 'androidx.browser:browser:1.0.0'
+
     implementation "com.google.firebase:firebase-messaging:17.3.4"
+
+    // ==== Test dependencies
+    testImplementation 'junit:junit:4.12'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.4.0'
+    testImplementation 'com.google.truth:truth:0.43'
+    testImplementation 'com.google.truth.extensions:truth-java8-extension:0.43'
+    testImplementation 'org.mockito:mockito-core:1.10.19'
+
+    // ==== RN-related dependencies
+
+    // For animated GIF support:
+    implementation "com.facebook.fresco:animated-gif:${rnProperties.get('FRESCO_VERSION')}"
+
+    // ----------------------------------------
+    // Dependencies from RN upstream, in the template app
+
+    implementation fileTree(dir: "libs", include: ["*.jar"])
     //noinspection GradleDynamicVersion
     implementation "com.facebook.react:react-native:+"  // From node_modules
 
-    // Workaround for facebook/react-native#32735; see
-    //   https://github.com/facebook/react-native/issues/32735#issue-1077061487
-    // TODO(react-native-68): Remove; fixed in facebook/react-native@f45889ef9
-    implementation('com.facebook.soloader:soloader:0.10.3') {
-        version {
-            strictly '0.10.3'
-        }
-    }
+    implementation "androidx.swiperefreshlayout:swiperefreshlayout:1.0.0"
 
     debugImplementation("com.facebook.flipper:flipper:${FLIPPER_VERSION}") {
         exclude group: 'com.facebook.fbjni'
@@ -232,15 +255,10 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+    // END dependencies from RN upstream
+    // ----------------------------------------
 
-    implementation 'com.facebook.fresco:animated-gif:2.0.0' // For animated GIF support
-    implementation 'androidx.browser:browser:1.0.0'
-
-    testImplementation 'junit:junit:4.12'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.4.0'
-    testImplementation 'com.google.truth:truth:0.43'
-    testImplementation 'com.google.truth.extensions:truth-java8-extension:0.43'
-    testImplementation 'org.mockito:mockito-core:1.10.19'
+    // Don't put new dependencies down here.  Put them above, before the upstream section.
 }
 
 // The default kotlinOptions.jvmTarget is 1.6.  With the default, we get

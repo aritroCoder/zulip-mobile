@@ -5,11 +5,10 @@ import type { PerAccountApplicableAction } from '../types';
 import type { UnreadMentionsState } from './unreadModelTypes';
 import {
   REGISTER_COMPLETE,
-  LOGOUT,
-  ACCOUNT_SWITCH,
   EVENT_NEW_MESSAGE,
   EVENT_MESSAGE_DELETE,
   EVENT_UPDATE_MESSAGE_FLAGS,
+  RESET_ACCOUNT_DATA,
 } from '../actionConstants';
 import { addItemsToArray, removeItemsFromArray } from '../utils/immutability';
 import { NULL_ARRAY } from '../nullObjects';
@@ -49,12 +48,17 @@ export default (
   action: PerAccountApplicableAction,
 ): UnreadMentionsState => {
   switch (action.type) {
-    case LOGOUT:
-    case ACCOUNT_SWITCH:
+    case RESET_ACCOUNT_DATA:
       return initialState;
 
     case REGISTER_COMPLETE:
-      return (action.data.unread_msgs && action.data.unread_msgs.mentions) || initialState;
+      return (
+        (action.data.unread_msgs && action.data.unread_msgs.mentions)
+        // TODO(#5102): Delete fallback once we refuse to connect to Zulip
+        //   servers before 1.7.0, when it seems this feature was added; see
+        //   comment on InitialDataUpdateMessageFlags.
+        || initialState
+      );
 
     case EVENT_NEW_MESSAGE: {
       const { flags } = action.message;

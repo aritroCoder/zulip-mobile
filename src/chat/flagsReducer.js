@@ -8,9 +8,7 @@ import {
   MESSAGE_FETCH_COMPLETE,
   EVENT_NEW_MESSAGE,
   EVENT_UPDATE_MESSAGE_FLAGS,
-  LOGOUT,
-  LOGIN_SUCCESS,
-  ACCOUNT_SWITCH,
+  RESET_ACCOUNT_DATA,
 } from '../actionConstants';
 import { deeperMerge } from '../utils/misc';
 import type { UserMessageFlag } from '../api/modelTypes';
@@ -103,7 +101,7 @@ const processFlagsForMessages = (
 const eventUpdateMessageFlags = (state, action) => {
   if (action.all) {
     if (action.op === 'add') {
-      return addFlagsForMessages(initialState, Object.keys(action.allMessages).map(Number), [
+      return addFlagsForMessages(state, action.allMessages.keySeq().toArray().map(Number), [
         action.flag,
       ]);
     }
@@ -134,9 +132,7 @@ export default (
 ): FlagsState => {
   switch (action.type) {
     case REGISTER_COMPLETE:
-    case LOGOUT:
-    case LOGIN_SUCCESS:
-    case ACCOUNT_SWITCH:
+    case RESET_ACCOUNT_DATA:
       return initialState;
 
     case MESSAGE_FETCH_COMPLETE:

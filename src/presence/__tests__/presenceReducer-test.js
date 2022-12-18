@@ -1,69 +1,51 @@
+/* @flow strict-local */
+
 import deepFreeze from 'deep-freeze';
 
-import {
-  REGISTER_COMPLETE,
-  PRESENCE_RESPONSE,
-  EVENT_PRESENCE,
-  ACCOUNT_SWITCH,
-} from '../../actionConstants';
+import * as eg from '../../__tests__/lib/exampleData';
+import { PRESENCE_RESPONSE, EVENT_PRESENCE } from '../../actionConstants';
 import presenceReducer from '../presenceReducer';
 
 const currentTimestamp = Date.now() / 1000;
 
 describe('presenceReducer', () => {
-  test('handles unknown action and no state by returning initial state', () => {
-    const newState = presenceReducer(undefined, {});
-    expect(newState).toBeDefined();
-  });
-
-  test('on unrecognized action, returns input state unchanged', () => {
-    const prevState = deepFreeze({ hello: 'world' });
-
-    const newState = presenceReducer(prevState, {});
-    expect(newState).toBe(prevState);
-  });
-
   describe('REGISTER_COMPLETE', () => {
     test('when `presence` data is provided init state with it', () => {
       const presenceData = {
         'email@example.com': {
-          aggregated: {
-            client: 'website',
-            status: 'active',
-            timestamp: 123,
-          },
+          aggregated: { client: 'website', status: 'active', timestamp: 123 },
+          website: { client: 'website', status: 'active', timestamp: 123 },
         },
       };
-      const initialState = deepFreeze({});
-      const action = deepFreeze({
-        type: REGISTER_COMPLETE,
-        data: {
-          presences: presenceData,
-        },
-      });
+      const prevState = deepFreeze(eg.baseReduxState.presence);
+      const action = eg.mkActionRegisterComplete({ presences: presenceData });
 
-      const actualState = presenceReducer(initialState, action);
+      const actualState = presenceReducer(prevState, action);
 
       expect(actualState).toEqual(presenceData);
     });
 
+    // TODO(#5102): Delete; see comment on implementation.
     test('when no `presence` data is given reset state', () => {
-      const initialState = deepFreeze({
+      const prevState = deepFreeze({
         'email@example.com': {
-          aggregated: {
-            client: 'website',
-            status: 'active',
-            timestamp: 123,
-          },
+          aggregated: { client: 'website', status: 'active', timestamp: 123 },
+          website: { client: 'website', status: 'active', timestamp: 123 },
         },
       });
-      const action = deepFreeze({
-        type: REGISTER_COMPLETE,
-        data: {},
+      const action = eg.mkActionRegisterComplete({
+        // Hmm, we should need a Flow suppression here. This property is
+        // marked required in InitialData, and this explicit undefined is
+        // meant to defy that; see TODO(#5102) above.
+        // mkActionRegisterComplete is designed to accept input with this or
+        // any property *omitted*… and I think, as a side effect of handling
+        // that, Flow mistakenly accepts an explicit undefined here, so it
+        // doesn't catch the resulting malformed InitialData.
+        presences: undefined,
       });
       const expectedState = {};
 
-      const actualState = presenceReducer(initialState, action);
+      const actualState = presenceReducer(prevState, action);
 
       expect(actualState).toEqual(expectedState);
     });
@@ -73,10 +55,8 @@ describe('presenceReducer', () => {
     test('merges a single user in presence response', () => {
       const presence = {
         'email@example.com': {
-          aggregated: {
-            status: 'active',
-            timestamp: 123,
-          },
+          aggregated: { status: 'active', timestamp: 123, client: 'website' },
+          website: { status: 'active', timestamp: 123, client: 'website' },
         },
       };
       const action = deepFreeze({
@@ -86,17 +66,13 @@ describe('presenceReducer', () => {
       });
 
       const prevState = deepFreeze({
-        'email@example.com': {},
+        'email@example.com': {
+          aggregated: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+          zulipMobile: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+        },
       });
 
-      const expectedState = {
-        'email@example.com': {
-          aggregated: {
-            status: 'active',
-            timestamp: 123,
-          },
-        },
-      };
+      const expectedState = { ...prevState, ...presence };
 
       const newState = presenceReducer(prevState, action);
 
@@ -105,24 +81,24 @@ describe('presenceReducer', () => {
 
     test('merges multiple users in presence response', () => {
       const prevState = deepFreeze({
-        'email@example.com': {},
-        'janedoe@example.com': {},
+        'email@example.com': {
+          aggregated: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+          zulipMobile: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+        },
+        'janedoe@example.com': {
+          aggregated: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+          zulipMobile: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+        },
       });
 
       const presence = {
         'email@example.com': {
-          aggregated: {
-            client: 'website',
-            status: 'active',
-            timestamp: 123,
-          },
+          aggregated: { client: 'website', status: 'active', timestamp: 123 },
+          website: { client: 'website', status: 'active', timestamp: 123 },
         },
         'johndoe@example.com': {
-          website: {
-            status: 'active',
-            timestamp: 345,
-            client: 'website',
-          },
+          aggregated: { status: 'active', timestamp: 345, client: 'website' },
+          website: { status: 'active', timestamp: 345, client: 'website' },
         },
       };
       const action = deepFreeze({
@@ -131,23 +107,7 @@ describe('presenceReducer', () => {
         serverTimestamp: 12345,
       });
 
-      const expectedState = {
-        'email@example.com': {
-          aggregated: {
-            client: 'website',
-            status: 'active',
-            timestamp: 123,
-          },
-        },
-        'johndoe@example.com': {
-          website: {
-            status: 'active',
-            timestamp: 345,
-            client: 'website',
-          },
-        },
-        'janedoe@example.com': {},
-      };
+      const expectedState = { ...prevState, ...presence };
 
       const newState = presenceReducer(prevState, action);
 
@@ -165,6 +125,7 @@ describe('presenceReducer', () => {
             timestamp: currentTimestamp - 20,
           },
           website: {
+            client: 'website',
             status: 'idle',
             timestamp: currentTimestamp - 20,
           },
@@ -172,6 +133,7 @@ describe('presenceReducer', () => {
       });
 
       const action = deepFreeze({
+        id: 1,
         type: EVENT_PRESENCE,
         email: 'email@example.com',
         server_timestamp: 200,
@@ -192,6 +154,7 @@ describe('presenceReducer', () => {
             timestamp: currentTimestamp - 10,
           },
           website: {
+            client: 'website',
             status: 'idle',
             timestamp: currentTimestamp - 20,
           },
@@ -209,23 +172,18 @@ describe('presenceReducer', () => {
     });
   });
 
-  describe('ACCOUNT_SWITCH', () => {
+  describe('RESET_ACCOUNT_DATA', () => {
     test('resets state to initial state', () => {
-      const initialState = deepFreeze([
-        {
-          full_name: 'Some Guy',
-          email: 'email@example.com',
-          status: 'offline',
+      const prevState = deepFreeze({
+        'email@example.com': {
+          aggregated: { status: 'active', timestamp: 8, client: 'zulipMobile' },
+          zulipMobile: { status: 'active', timestamp: 8, client: 'zulipMobile' },
         },
-      ]);
-
-      const action = deepFreeze({
-        type: ACCOUNT_SWITCH,
       });
 
       const expectedState = {};
 
-      const actualState = presenceReducer(initialState, action);
+      const actualState = presenceReducer(prevState, eg.action.reset_account_data);
 
       expect(actualState).toEqual(expectedState);
     });

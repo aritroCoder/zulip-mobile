@@ -1,6 +1,6 @@
 /* @flow strict-local */
 import type { TopicsState, PerAccountApplicableAction } from '../types';
-import { LOGOUT, ACCOUNT_SWITCH, INIT_TOPICS, EVENT_NEW_MESSAGE } from '../actionConstants';
+import { INIT_TOPICS, EVENT_NEW_MESSAGE, RESET_ACCOUNT_DATA } from '../actionConstants';
 import { NULL_OBJECT } from '../nullObjects';
 import { replaceItemInArray } from '../utils/immutability';
 
@@ -41,8 +41,7 @@ export default (
   action: PerAccountApplicableAction,
 ): TopicsState => {
   switch (action.type) {
-    case LOGOUT:
-    case ACCOUNT_SWITCH:
+    case RESET_ACCOUNT_DATA:
       return initialState;
 
     case INIT_TOPICS:

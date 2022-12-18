@@ -20,6 +20,7 @@ import CompressedAsyncStorage from '../storage/CompressedAsyncStorage';
 import createMigration from '../redux-persist-migrate/index';
 import { getGlobalSession, getGlobalSettings } from '../directSelectors';
 import { migrations } from '../storage/migrations';
+import type { Dispatch, GlobalThunkExtras } from '../reduxTypes';
 
 if (process.env.NODE_ENV === 'development') {
   // Chrome dev tools for Immutable.
@@ -72,12 +73,33 @@ export const cacheKeys: $ReadOnlyArray<$Keys<GlobalState>> = [
   'realm', 'streams', 'subscriptions', 'unread', 'userGroups', 'users',
 ];
 
-const thunkExtras: ThunkExtras = {
-  // eslint-disable-next-line no-use-before-define
-  getGlobalSession: () => getGlobalSession(store.getState()),
+/* eslint-disable no-use-before-define */
 
-  // eslint-disable-next-line no-use-before-define
+const thunkExtras: $Exact<ThunkExtras> = {
+  getGlobalSession: () => getGlobalSession(store.getState()),
   getGlobalSettings: () => getGlobalSettings(store.getState()),
+};
+
+const globalThunkExtras: $Exact<GlobalThunkExtras> = {
+  // $FlowFixMe[escaped-generic]
+  // $FlowFixMe[incompatible-type]
+  /* $FlowFixMe[incompatible-cast]
+     The `store` type isn't complete: in particular it ignores thunk actions.
+
+     We're also using here the fact that the one function `store.dispatch`
+     secretly plays both the role of our `GlobalDispatch` type and our
+     `Dispatch` type... and that in the latter role, the PerAccountState
+     that it acts on is the one belonging to the active account.
+
+     TODO(#5006): We'll have to add more logic here when per-account and
+       global state become distinct.
+   */
+  activeAccountDispatch: action => (store.dispatch: Dispatch)(action),
+};
+
+const combinedThunkExtras: ThunkExtras & GlobalThunkExtras = {
+  ...thunkExtras,
+  ...globalThunkExtras,
 };
 
 /**
@@ -97,7 +119,7 @@ function listMiddleware() {
     // Handle the fancy "thunk" actions we often use, i.e. async
     // functions of `dispatch` and `state`.  See docs:
     //   https://github.com/reduxjs/redux-thunk
-    thunkMiddleware.withExtraArgument(thunkExtras),
+    thunkMiddleware.withExtraArgument(combinedThunkExtras),
   ];
 
   if (config.enableReduxLogging) {

@@ -1,8 +1,9 @@
+/* @flow strict-local */
+
 import deepFreeze from 'deep-freeze';
 
+import * as eg from '../../__tests__/lib/exampleData';
 import {
-  REGISTER_COMPLETE,
-  ACCOUNT_SWITCH,
   EVENT_USER_GROUP_ADD,
   EVENT_USER_GROUP_REMOVE,
   EVENT_USER_GROUP_UPDATE,
@@ -12,292 +13,203 @@ import {
 import userGroupsReducer from '../userGroupsReducer';
 
 describe('userGroupsReducer', () => {
-  test('handles unknown action and no state by returning initial state', () => {
-    const initialState = undefined;
-
-    const action = deepFreeze({});
-
-    const newState = userGroupsReducer(initialState, action);
-    expect(newState).toBeDefined();
-  });
-
   describe('REGISTER_COMPLETE', () => {
     test('when data is provided init state with it', () => {
-      const initialState = deepFreeze([]);
-      const action = deepFreeze({
-        type: REGISTER_COMPLETE,
-        data: {
-          realm_user_groups: [
-            {
-              id: 1,
-              name: 'Some user group',
-              members: [],
-            },
-          ],
-        },
-      });
+      const group = eg.makeUserGroup();
 
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual([
-        {
-          id: 1,
-          name: 'Some user group',
-          members: [],
-        },
-      ]);
+      const prevState = deepFreeze(eg.plusReduxState.userGroups);
+      expect(
+        userGroupsReducer(prevState, eg.mkActionRegisterComplete({ realm_user_groups: [group] })),
+      ).toEqual([group]);
     });
 
+    // TODO(#5102): Remove this test case, which is for pre-1.8 servers.
     test('when no data is given reset state', () => {
-      const initialState = deepFreeze([['stream'], ['topic']]);
-      const action = deepFreeze({
-        type: REGISTER_COMPLETE,
-        data: {},
-      });
-      const expectedState = [];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([eg.makeUserGroup()]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          eg.mkActionRegisterComplete({
+            // Hmm, we should need a Flow suppression here. This property is
+            // marked required in InitialData, and this explicit undefined is
+            // meant to defy that; see TODO(#5102) above.
+            // mkActionRegisterComplete is designed to accept input with this or
+            // any property *omitted*… and I think, as a side effect of handling
+            // that, Flow mistakenly accepts an explicit undefined here, so it
+            // doesn't catch the resulting malformed InitialData.
+            realm_user_groups: undefined,
+          }),
+        ),
+      ).toEqual([]);
     });
   });
 
-  describe('ACCOUNT_SWITCH', () => {
+  describe('RESET_ACCOUNT_DATA', () => {
     test('resets state to initial state', () => {
-      const initialState = deepFreeze([
-        {
-          id: 1,
-          name: 'Some Group',
-          description: 'This is some group',
-          members: [],
-        },
-      ]);
-
-      const action = deepFreeze({
-        type: ACCOUNT_SWITCH,
-      });
-
-      const expectedState = [];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([eg.makeUserGroup()]);
+      expect(userGroupsReducer(prevState, eg.action.reset_account_data)).toEqual([]);
     });
   });
 
   describe('EVENT_USER_GROUP_ADD', () => {
     test('adds a user group to the state', () => {
-      const initialState = deepFreeze([]);
-      const group = {
-        id: 1,
-        name: 'Some Group',
-        description: 'This is some group',
-        members: [123],
-      };
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_ADD,
-        op: 'add',
-        group,
-      });
+      const group = eg.makeUserGroup();
 
-      const expectedState = [group];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({ id: 1, type: EVENT_USER_GROUP_ADD, op: 'add', group }),
+        ),
+      ).toEqual([group]);
     });
   });
 
   describe('EVENT_USER_GROUP_REMOVE', () => {
     test('if user group does not exist state does not change', () => {
-      const initialState = deepFreeze([]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_REMOVE,
-        op: 'remove',
-        group_id: 1,
-      });
-      const expectedState = [];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({ id: 1, type: EVENT_USER_GROUP_REMOVE, op: 'remove', group_id: 1 }),
+        ),
+      ).toEqual([]);
     });
 
     test('adds a user group to the state', () => {
-      const initialState = deepFreeze([
-        {
-          id: 1,
-          name: 'Some group',
-        },
-        {
-          id: 2,
-          name: 'Another group',
-        },
-      ]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_REMOVE,
-        op: 'remove',
-        group_id: 1,
-      });
+      const group1 = eg.makeUserGroup();
+      const group2 = eg.makeUserGroup();
 
-      const expectedState = [
-        {
-          id: 2,
-          name: 'Another group',
-        },
-      ];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([group1, group2]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({ id: 1, type: EVENT_USER_GROUP_REMOVE, op: 'remove', group_id: group1.id }),
+        ),
+      ).toEqual([group2]);
     });
   });
 
   describe('EVENT_USER_GROUP_UPDATE', () => {
     test('if user group does not exist state does not change', () => {
-      const initialState = deepFreeze([]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_UPDATE,
-        op: 'update',
-        group_id: 1,
-        data: { name: 'Some name' },
-      });
-      const expectedState = [];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({
+            id: 1,
+            type: EVENT_USER_GROUP_UPDATE,
+            op: 'update',
+            group_id: 1,
+            data: { name: 'Some name' },
+          }),
+        ),
+      ).toEqual([]);
     });
 
     test('updates an existing user group with supplied new values', () => {
-      const initialState = deepFreeze([
-        {
-          id: 1,
-          name: 'Some group',
-        },
-        {
-          id: 2,
-          name: 'Another group',
-        },
-      ]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_UPDATE,
-        op: 'update',
-        group_id: 2,
-        data: { name: 'New name' },
-      });
-      const expectedState = [
-        {
-          id: 1,
-          name: 'Some group',
-        },
-        {
-          id: 2,
-          name: 'New name',
-        },
-      ];
+      const group1 = eg.makeUserGroup();
+      const group2 = eg.makeUserGroup();
 
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([group1, group2]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({
+            id: 1,
+            type: EVENT_USER_GROUP_UPDATE,
+            op: 'update',
+            group_id: group2.id,
+            data: { name: 'New name' },
+          }),
+        ),
+      ).toEqual([group1, { ...group2, name: 'New name' }]);
     });
   });
 
   describe('EVENT_USER_GROUP_ADD_MEMBERS', () => {
     test('if user group does not exist state does not change', () => {
-      const initialState = deepFreeze([]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_ADD_MEMBERS,
-        op: 'add_members',
-        group_id: 1,
-        user_ids: [1, 2, 3],
-      });
-      const expectedState = [];
+      const prevState = deepFreeze([]);
 
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({
+            id: 1,
+            type: EVENT_USER_GROUP_ADD_MEMBERS,
+            op: 'add_members',
+            group_id: 1,
+            user_ids: [eg.makeUser().user_id, eg.makeUser().user_id, eg.makeUser().user_id],
+          }),
+        ),
+      ).toEqual([]);
     });
 
     test('updates an existing user group with supplied new members', () => {
-      const initialState = deepFreeze([
-        {
-          id: 1,
-          name: 'Some group',
-          members: [1],
-        },
+      const group = eg.makeUserGroup({ members: [eg.selfUser.user_id] });
+
+      const prevState = deepFreeze([group]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({
+            id: 1,
+            type: EVENT_USER_GROUP_ADD_MEMBERS,
+            op: 'add_members',
+            group_id: group.id,
+            user_ids: [eg.otherUser.user_id, eg.thirdUser.user_id],
+          }),
+        ),
+      ).toEqual([
+        { ...group, members: [eg.selfUser.user_id, eg.otherUser.user_id, eg.thirdUser.user_id] },
       ]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_ADD_MEMBERS,
-        op: 'add_members',
-        group_id: 1,
-        user_ids: [2, 3],
-      });
-      const expectedState = [
-        {
-          id: 1,
-          name: 'Some group',
-          members: [1, 2, 3],
-        },
-      ];
-
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
     });
   });
 
   describe('EVENT_USER_GROUP_REMOVE_MEMBERS', () => {
     test('if user group does not exist state does not change', () => {
-      const initialState = deepFreeze([]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_REMOVE_MEMBERS,
-        op: 'remove_members',
-        group_id: 1,
-        user_ids: [1],
-      });
-      const expectedState = [];
+      const prevState = deepFreeze([]);
 
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({
+            id: 1,
+            type: EVENT_USER_GROUP_REMOVE_MEMBERS,
+            op: 'remove_members',
+            group_id: 1,
+            user_ids: [eg.makeUser().user_id],
+          }),
+        ),
+      ).toEqual([]);
     });
 
     test('removes members from an existing user group', () => {
-      const initialState = deepFreeze([
-        {
-          id: 1,
-          name: 'Some group',
-          members: [1, 2, 3, 4],
-        },
-        {
-          id: 2,
-          name: 'Another group',
-          members: [1, 2, 3, 4],
-        },
-      ]);
-      const action = deepFreeze({
-        type: EVENT_USER_GROUP_REMOVE_MEMBERS,
-        op: 'remove_members',
-        group_id: 1,
-        user_ids: [2, 3],
+      const user1 = eg.makeUser();
+      const user2 = eg.makeUser();
+      const user3 = eg.makeUser();
+      const user4 = eg.makeUser();
+
+      const group1 = eg.makeUserGroup({
+        members: [user1.user_id, user2.user_id, user3.user_id, user4.user_id],
       });
-      const expectedState = [
-        {
-          id: 1,
-          name: 'Some group',
-          members: [1, 4],
-        },
-        {
-          id: 2,
-          name: 'Another group',
-          members: [1, 2, 3, 4],
-        },
-      ];
+      const group2 = eg.makeUserGroup({
+        members: [user1.user_id, user2.user_id, user3.user_id, user4.user_id],
+      });
 
-      const actualState = userGroupsReducer(initialState, action);
-
-      expect(actualState).toEqual(expectedState);
+      const prevState = deepFreeze([group1, group2]);
+      expect(
+        userGroupsReducer(
+          prevState,
+          deepFreeze({
+            id: 1,
+            type: EVENT_USER_GROUP_REMOVE_MEMBERS,
+            op: 'remove_members',
+            group_id: group1.id,
+            user_ids: [user2.user_id, user3.user_id],
+          }),
+        ),
+      ).toEqual([{ ...group1, members: [user1.user_id, user4.user_id] }, group2]);
     });
   });
 });

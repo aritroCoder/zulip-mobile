@@ -10,6 +10,7 @@ import {
   ACCOUNT_REMOVE,
   LOGIN_SUCCESS,
   LOGOUT,
+  RESET_ACCOUNT_DATA,
   DISMISS_SERVER_PUSH_SETUP_NOTICE,
   GOT_PUSH_TOKEN,
   UNACK_PUSH_TOKEN,
@@ -168,6 +169,10 @@ export type LoginSuccessAction = $ReadOnly<{|
 
 type LogoutAction = $ReadOnly<{|
   type: typeof LOGOUT,
+|}>;
+
+export type ResetAccountDataAction = $ReadOnly<{|
+  type: typeof RESET_ACCOUNT_DATA,
 |}>;
 
 type DismissServerPushSetupNoticeAction = $ReadOnly<{|
@@ -599,6 +604,11 @@ type InitTopicsAction = $ReadOnly<{|
   streamId: number,
 |}>;
 
+type RefreshServerEmojiDataAction = $ReadOnly<{|
+  type: typeof REFRESH_SERVER_EMOJI_DATA,
+  data: ServerEmojiData,
+|}>;
+
 /* eslint-disable spaced-comment */
 
 ////
@@ -611,23 +621,11 @@ type InitTopicsAction = $ReadOnly<{|
 // First, some convenience unions without much meaning.
 // (We should perhaps just inline these below.)
 
-type AccountAction =
-  | AccountSwitchAction
-  | AccountRemoveAction
-  | LoginSuccessAction
-  | LogoutAction
-  | DismissServerPushSetupNoticeAction;
-
 type LoadingAction =
   | DeadQueueAction
   | RegisterStartAction
   | RegisterAbortAction
   | RegisterCompleteAction;
-
-type RefreshServerEmojiDataAction = $ReadOnly<{|
-  type: typeof REFRESH_SERVER_EMOJI_DATA,
-  data: ServerEmojiData,
-|}>;
 
 type MessageAction = MessageFetchStartAction | MessageFetchErrorAction | MessageFetchCompleteAction;
 
@@ -653,6 +651,7 @@ export type PerAccountAction =
   // The grouping here is completely arbitrary; don't worry about it.
   | EventAction
   | LoadingAction
+  | ResetAccountDataAction
   | RefreshServerEmojiDataAction
   | MessageAction
   | OutboxAction
@@ -672,7 +671,11 @@ export type AllAccountsAction =
   // This affects all the per-account states as well as everything else.
   | RehydrateAction
   // These can rearrange the `state.accounts` list itself.
-  | AccountAction
+  | AccountSwitchAction
+  | AccountRemoveAction
+  | LoginSuccessAction
+  | LogoutAction
+  | DismissServerPushSetupNoticeAction
   // These two are about a specific account… but not just the active one,
   // and they encode which one they mean.
   | AckPushTokenAction | UnackPushTokenAction
@@ -742,6 +745,7 @@ export type DispatchableWithoutAccountAction =
 /** True just if the action is a PerAccountApplicableAction. */
 export function isPerAccountApplicableAction(action: Action): boolean {
   switch (action.type) {
+    case RESET_ACCOUNT_DATA:
     case EVENT:
     case EVENT_ALERT_WORDS:
     case EVENT_MESSAGE_DELETE:

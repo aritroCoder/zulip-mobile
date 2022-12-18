@@ -1,12 +1,6 @@
 /* @flow strict-local */
 import * as NavigationService from '../nav/NavigationService';
-import type {
-  Dispatch,
-  PerAccountAction,
-  AllAccountsAction,
-  ThunkAction,
-  GlobalThunkAction,
-} from '../types';
+import type { PerAccountAction, AllAccountsAction, GlobalThunkAction } from '../types';
 import {
   ACCOUNT_SWITCH,
   ACCOUNT_REMOVE,
@@ -17,6 +11,7 @@ import { registerAndStartPolling } from '../events/eventActions';
 import { resetToMainTabs } from '../nav/navActions';
 import { sendOutbox } from '../outbox/outboxActions';
 import { initNotifications } from '../notification/notifTokens';
+import { resetAccountData } from './logoutActions';
 
 export const dismissServerPushSetupNotice = (): PerAccountAction => ({
   type: DISMISS_SERVER_PUSH_SETUP_NOTICE,
@@ -34,30 +29,20 @@ const accountSwitchPlain = (index: number): AllAccountsAction => ({
 
 export const accountSwitch =
   (index: number): GlobalThunkAction<Promise<void>> =>
-  async (dispatch, getState) => {
+  async (dispatch, getState, { activeAccountDispatch }) => {
     NavigationService.dispatch(resetToMainTabs());
+
+    // Clear out the space we use for the active account's server data, to
+    // make way for a new active account.
+    // TODO(#5006): When each account has its own space to hold server data,
+    //   we won't have to do this.
+    activeAccountDispatch(resetAccountData());
+
     dispatch(accountSwitchPlain(index));
 
-    /* $FlowFixMe[incompatible-type]
-
-     This is really a GlobalDispatch, because we're in a GlobalThunkAction.
-     (It's global because it needs to know about all the accounts to set the
-     pointer to the active one). But here, we pretend it's a Dispatch.
-     That's OK, for now, because:
-
-     - Our Dispatch function is secretly the same value as our
-       GlobalDispatch.
-     - The PerAccountState that Dispatch currently acts on is the one
-       belonging to the active account.
-     - We want this dispatch to act on the active account -- the new,
-       post-switch active account.
-     - It will act on that account, because at this point we've already
-       dispatched `accountSwitchPlain`.
-
-     TODO(#5006): perhaps have an `activeAccountDispatch: Dispatch` in
-       a new GlobalThunkExtras, modeled on ThunkExtras?
-  */
-    const activeAccountDispatch: Dispatch = dispatch;
+    // Now dispatch some actions on the new, post-switch active account.
+    // Because we just dispatched `accountSwitchPlain`, that new account
+    // is now the active account, so `activeAccountDispatch` will act on it.
 
     await activeAccountDispatch(registerAndStartPolling());
 
@@ -80,15 +65,27 @@ const loginSuccessPlain = (realm: URL, email: string, apiKey: string): AllAccoun
 });
 
 export const loginSuccess =
-  (realm: URL, email: string, apiKey: string): ThunkAction<Promise<void>> =>
-  async (dispatch, getState) => {
+  (realm: URL, email: string, apiKey: string): GlobalThunkAction<Promise<void>> =>
+  async (dispatch, getState, { activeAccountDispatch }) => {
     NavigationService.dispatch(resetToMainTabs());
+
+    // In case there's already an active account, clear out the space we use
+    // for the active account's server data, to make way for a new active
+    // account.
+    // TODO(#5006): When each account has its own space to hold server data,
+    //   we won't have to do this.
+    activeAccountDispatch(resetAccountData());
+
     dispatch(loginSuccessPlain(realm, email, apiKey));
 
-    await dispatch(registerAndStartPolling());
+    // Now dispatch some actions on the new, post-login active account.
+    // Because we just dispatched `loginSuccessPlain`, that new account is
+    // now the active account, so `activeAccountDispatch` will act on it.
+
+    await activeAccountDispatch(registerAndStartPolling());
 
     // TODO(#3881): Lots of issues with outbox sending
-    dispatch(sendOutbox());
+    activeAccountDispatch(sendOutbox());
 
-    dispatch(initNotifications());
+    activeAccountDispatch(initNotifications());
   };
