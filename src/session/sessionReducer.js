@@ -3,9 +3,8 @@ import type { Debug, Orientation, Action } from '../types';
 import {
   REHYDRATE,
   DEAD_QUEUE,
-  LOGIN_SUCCESS,
+  RESET_ACCOUNT_DATA,
   APP_ONLINE,
-  ACCOUNT_SWITCH,
   REGISTER_START,
   REGISTER_ABORT,
   REGISTER_COMPLETE,
@@ -13,7 +12,6 @@ import {
   TOGGLE_OUTBOX_SENDING,
   DEBUG_FLAG_TOGGLE,
   GOT_PUSH_TOKEN,
-  LOGOUT,
   DISMISS_SERVER_COMPAT_NOTICE,
 } from '../actionConstants';
 
@@ -117,20 +115,28 @@ export type SessionState = $ReadOnly<{|
 // PerAccountSessionState is inexact.)
 (s: SessionState): PerAccountSessionState => s; // eslint-disable-line no-unused-expressions
 
-const initialState: SessionState = {
-  eventQueueId: null,
-
+const initialGlobalSessionState: $Exact<GlobalSessionState> = {
   // This will be `null` on startup, while we wait to hear `true` or `false`
   // from the native module over the RN bridge; so, have it start as `null`.
   isOnline: null,
 
   isHydrated: false,
-  loading: false,
   orientation: 'PORTRAIT',
-  outboxSending: false,
   pushToken: null,
   debug: Object.freeze({}),
+};
+
+/** PRIVATE; exported only for tests. */
+export const initialPerAccountSessionState: $Exact<PerAccountSessionState> = {
+  eventQueueId: null,
+  loading: false,
+  outboxSending: false,
   hasDismissedServerCompatNotice: false,
+};
+
+const initialState: SessionState = {
+  ...initialGlobalSessionState,
+  ...initialPerAccountSessionState,
 };
 
 // eslint-disable-next-line default-param-last
@@ -146,34 +152,15 @@ export default (state: SessionState = initialState, action: Action): SessionStat
         eventQueueId: null,
       };
 
-    case LOGIN_SUCCESS:
+    case RESET_ACCOUNT_DATA:
       return {
         ...state,
 
-        // We're about to request a new event queue; no use hanging on to
-        // any old one we might have.
-        eventQueueId: null,
-      };
-
-    case LOGOUT:
-      return {
-        ...state,
-        loading: false,
-
-        // Stop polling this event queue.
-        eventQueueId: null,
-      };
-
-    case ACCOUNT_SWITCH:
-      return {
-        ...state,
-        loading: false,
-
-        // Stop polling this event queue.  (We'll request a new one soon,
-        // for the new account.)
-        // TODO(#5005): Keep polling on accounts other than the active
-        //   account.
-        eventQueueId: null,
+        // Clear per-account session state. Importantly, stop polling on the
+        // account's current event queue if we had one. In the polling loop,
+        // after each server response, we check if we've dropped the queue
+        // ID from this state and break out if so.
+        ...initialPerAccountSessionState,
       };
 
     case REHYDRATE:
